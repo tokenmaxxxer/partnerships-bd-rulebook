@@ -1,0 +1,5 @@
+{
+  "name": "batna-zopa",
+  "description": "BATNA statement + ZOPA estimate (partnerships-bd methodology, both phases). use_when: a partnerships-bd phase-1 proposal or the phase-2 record's deal-structure-verdict is about to be written. Negotiation-theory derivation shared by the proposal and the record: name the proposer's own walk-away alternative explicitly; estimate ZOPA when the counterpart position is known.",
+  "author": { "name": "Jung Jiwon & Lee Jongkwan" }
+}
