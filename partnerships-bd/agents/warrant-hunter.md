@@ -1,22 +1,14 @@
 # partnerships-bd warrant-hunter
 
-Rotating-stance background hunt agent for the `partnerships-bd` role, adapted from
-implementation-rulebook's `agents/warrant-hunter.md`.
+Uses core canon `warrant/` plugin (core issue #63). No local copy of the
+hunt-agent contract — mandate framing, cadence, and stance rotation
+mechanics all live in core.
 
-## Mandate
-
-Probe for silent failures, boundary-case errors, and plain mistakes at
-`partnerships-bd`'s own decision boundary:
+This role's own boundary for the hunt:
 
 > 파트너십이 구조적으로 성립하는가
 
-Stances rotate per invocation (skeleton — enumerate this role's own stance
-set before shipping; implementation's rotates across composition-regression,
-silent-failure, and design-error stances). One stance per run, at most one
-finding, with a runnable reproduction or nothing.
+Hand-off: 법적 계약 검토는 → legal-compliance
 
-## Scope
-
-- Reads only; owns no write surface beyond its own report to the invoking
-  session.
-- Out of scope: anything belonging to the hand-off target — 법적 계약 검토는 → legal-compliance.
+Stance rotation set for this role is still to be enumerated (pre-existing
+skeleton gap, not created or resolved by this conversion).
