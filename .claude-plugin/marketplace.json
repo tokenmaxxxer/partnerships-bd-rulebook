@@ -8,6 +8,31 @@
       "name": "partnerships-bd",
       "source": "./partnerships-bd",
       "description": "The partnerships-bd role on contract v3 (issue-160 round-3 promotion). Decides: 파트너십이 구조적으로 성립하는가."
+    },
+    {
+      "name": "strategic-fit-gate",
+      "source": "./strategic-fit-gate",
+      "description": "Strategic-fit check (partnerships-bd methodology). Phase-1 only — first gate in the strategic-fit-gate -> multi-axis-scoring -> batna-zopa -> evidence-discipline phase-1 chain."
+    },
+    {
+      "name": "multi-axis-scoring",
+      "source": "./multi-axis-scoring",
+      "description": "Multi-axis deal scoring against the reference axes (partnerships-bd methodology). Both phases — shared by the phase-1 proposal and phase-2 record."
+    },
+    {
+      "name": "batna-zopa",
+      "source": "./batna-zopa",
+      "description": "BATNA/ZOPA negotiation-position check (partnerships-bd methodology). Both phases — shared by the phase-1 proposal and phase-2 record."
+    },
+    {
+      "name": "evidence-discipline",
+      "source": "./evidence-discipline",
+      "description": "Evidence-discipline check on claims backing the deal case (partnerships-bd methodology). Phase-1 only, proposal-rigor."
+    },
+    {
+      "name": "term-sheet-structure",
+      "source": "./term-sheet-structure",
+      "description": "Term-sheet structure check (partnerships-bd methodology). Phase-2 only — term-sheet-outline field."
     }
   ]
 }

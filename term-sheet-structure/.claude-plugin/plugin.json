@@ -1,0 +1,5 @@
+{
+  "name": "term-sheet-structure",
+  "description": "7-subsection term-sheet norm (partnerships-bd methodology, phase 2 only). use_when: the partnerships-bd phase-2 record's term-sheet-outline field is about to be written. Emits all 7 named sub-sections in order; exit/termination is non-optional and governance/KPIs are kept distinct. term-sheet-outline is a phase-2-record-only field; no phase-1 proposal carries a term sheet.",
+  "author": { "name": "Jung Jiwon & Lee Jongkwan" }
+}

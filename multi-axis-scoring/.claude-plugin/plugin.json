@@ -1,0 +1,5 @@
+{
+  "name": "multi-axis-scoring",
+  "description": "Weighted multi-axis evaluation table (partnerships-bd methodology, both phases). use_when: a partnerships-bd phase-1 proposal's scoring table or the phase-2 record's deal-structure-verdict is about to be written. Same methodology derives both the phase-1 proposal's evaluation table and the phase-2 record's deal-structure-verdict — see reference/axes.md for the canonical 6-axis list.",
+  "author": { "name": "Jung Jiwon & Lee Jongkwan" }
+}

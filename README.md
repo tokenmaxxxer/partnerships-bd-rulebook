@@ -31,3 +31,27 @@ claude plugin install partnerships-bd
 This is scaffolding, not a finished rulebook: fill in doctrine detail,
 handoff enforcement, and any role-specific progress gate before treating
 it as load-bearing.
+
+## Methodology plugins
+
+Five methodology plugins live as siblings of the `partnerships-bd` role
+plugin, one per adopted methodology. Each is self-contained (own
+`directive.sh`, own gate script, own `tests/*-tests.sh`), fails closed, and
+carries its own kill-switch env var.
+
+- `strategic-fit-gate` — checks the deal fits strategic intent before scoring starts
+- `multi-axis-scoring` — scores the deal against the reference axes (`reference/axes.md`)
+- `batna-zopa` — checks the BATNA/ZOPA negotiation position is stated
+- `evidence-discipline` — checks the claims backing the deal case are evidenced
+- `term-sheet-structure` — checks the term-sheet-outline field is structured
+
+Phase-1 chain: `strategic-fit-gate` -> `multi-axis-scoring` -> `batna-zopa` -> `evidence-discipline`.
+Phase-2: `multi-axis-scoring` + `batna-zopa` + `term-sheet-structure`.
+
+## Run the checks
+
+```
+/bin/bash tests/parse-check.sh
+/bin/bash tests/run-gate-tests.sh
+/bin/bash tests/deny-only-check.sh
+```

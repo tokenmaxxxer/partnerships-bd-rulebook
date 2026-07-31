@@ -1,0 +1,5 @@
+{
+  "name": "evidence-discipline",
+  "description": "Stage declaration + citation-per-claim (partnerships-bd methodology, phase 1 only). use_when: a partnerships-bd phase-1 proposal is about to be written. Proposal-rigor methodology: declare non-binding vs binding-terms-ready; cite a source per framework claim and per factual candidate-partner claim. Does not re-fire on the phase-2 record.",
+  "author": { "name": "Jung Jiwon & Lee Jongkwan" }
+}
