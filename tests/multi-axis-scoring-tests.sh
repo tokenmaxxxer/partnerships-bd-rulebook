@@ -201,5 +201,11 @@ printf '{"tool_name":"Bash","tool_input":{"command":"printf x >> %s"},"cwd":"%s"
 rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
 rm -rf "$td"; report deny "$got" bash-tool-write-into-scope-deny
 
+# missing-core: guarded source must deny, not silently allow (issue-13/issue-75)
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+printf '' | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd CLAUDE_PLUGIN_ROOT_CORE="$td/no-such-core" /bin/bash "$HOOKS/multi-axis-scoring-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" missing-core-source-guard-deny
+
 printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

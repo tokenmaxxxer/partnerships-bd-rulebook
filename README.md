@@ -54,8 +54,9 @@ Phase-2: `multi-axis-scoring` + `batna-zopa` + `term-sheet-structure`.
 Each gate references core canon `core/hooks/lib/gate-lib.sh` +
 `gate-lib.py` (issue-72, `docs/handbooks/gate-house-standard.md`) for its
 fail-closed trap, kill-switch check, path normalization, and Write/Edit/
-MultiEdit/NotebookEdit reconstruction — sourced via
-`${CLAUDE_PLUGIN_ROOT_CORE:-...}/hooks/lib/gate-lib.sh`, never
+MultiEdit reconstruction (plus Bash-tool write-target detection via
+`gate_bash_write_targets`, matched in each plugin's `hooks.json`) —
+sourced via `${CLAUDE_PLUGIN_ROOT_CORE:-...}/hooks/lib/gate-lib.sh`, never
 reimplemented locally. `core/hooks/tests/compliance-check.sh` must pass
 clean against each of the 5 gate directories.
 
