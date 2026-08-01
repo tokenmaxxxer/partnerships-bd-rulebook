@@ -149,5 +149,100 @@ printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":%s},"cwd":
 rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
 rm -rf "$td"; report allow "$got" wrong-role-pass
 
+# --- mandatory cases (issue-10): Edit replace_all, MultiEdit mixed, ------
+# malformed-JSON variants, kill-switch unrecognized value, absolute path,
+# Bash-tool write into scope. ------------------------------------------------
+
+EXIT_BLOCK='## Exit/Termination
+Either party may terminate with 90 days notice.'
+
+DUP_FULL="$FULL
+
+$EXIT_BLOCK
+
+END_MARKER"
+
+# Edit replace_all:true deletes BOTH copies of the exit/termination section
+# -> missing exit clause -> deny. A first-occurrence-only bug would leave
+# the duplicated copy intact and wrongly allow.
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '%s' "$DUP_FULL" > "$td/$TARGET"
+printf '{"tool_name":"Edit","tool_input":{"file_path":"%s","old_string":%s,"new_string":"","replace_all":true},"cwd":"%s"}' \
+  "$TARGET" "$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$EXIT_BLOCK")" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/term-sheet-structure-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" edit-replace-all-removes-all-occurrences-deny
+
+# MultiEdit mixed: a replace_all:false edit touches an unrelated marker; a
+# replace_all:true edit strips both copies of the exit/termination block.
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '%s' "$DUP_FULL" > "$td/$TARGET"
+payload="$(BLOCK="$EXIT_BLOCK" TARGET_PATH="$TARGET" CWD_PATH="$td" python3 -c '
+import json, os
+edits = [
+    {"old_string": "END_MARKER", "new_string": "END_MARKER (checked)", "replace_all": False},
+    {"old_string": os.environ["BLOCK"], "new_string": "", "replace_all": True},
+]
+print(json.dumps({"tool_name": "MultiEdit", "tool_input": {"file_path": os.environ["TARGET_PATH"], "edits": edits}, "cwd": os.environ["CWD_PATH"]}))
+')"
+printf '%s' "$payload" | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/term-sheet-structure-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" multiedit-mixed-replace-all-deny
+
+# malformed JSON: truncated
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+printf '{"tool_name":"Write","tool_inp' | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/term-sheet-structure-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" malformed-json-truncated-deny
+
+# malformed JSON: valid JSON but not an object
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+printf '[1,2,3]' | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/term-sheet-structure-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" malformed-json-non-object-deny
+
+# malformed JSON: empty stdin
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+printf '' | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/term-sheet-structure-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" malformed-json-empty-stdin-deny
+
+# kill switch: unrecognized/typo value must stay active
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":%s},"cwd":"%s"}' \
+  "$TARGET" "$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$NO_EXIT")" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd TERM_SHEET_STRUCTURE_GATE_OFF=xyzzy /bin/bash "$HOOKS/term-sheet-structure-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" kill-switch-unrecognized-value-stays-active
+
+# absolute file_path matching the same scope a relative fixture matches
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s/%s","content":%s},"cwd":"%s"}' \
+  "$td" "$TARGET" "$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$NO_EXIT")" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/term-sheet-structure-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" absolute-path-deny
+
+# ./-prefixed relative variant
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '{"tool_name":"Write","tool_input":{"file_path":"./%s","content":%s},"cwd":"%s"}' \
+  "$TARGET" "$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$NO_EXIT")" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/term-sheet-structure-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" dot-slash-prefixed-path-deny
+
+# a Bash-tool write reaching this gate's scope is refused the same way
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '{"tool_name":"Bash","tool_input":{"command":"printf x >> %s"},"cwd":"%s"}' "$TARGET" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/term-sheet-structure-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" bash-tool-write-into-scope-deny
+
 printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

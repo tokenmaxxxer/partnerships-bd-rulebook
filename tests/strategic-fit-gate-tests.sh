@@ -90,5 +90,112 @@ printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":%s},"cwd":
 rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
 rm -rf "$td"; report allow "$got" phase2-record-pass-through
 
+# --- mandatory cases (issue-10): Edit replace_all, MultiEdit mixed, ------
+# malformed-JSON variants, kill-switch unrecognized value, absolute path,
+# Bash-tool write into scope. ------------------------------------------------
+
+DUP_GOOD='# Proposal
+Strategic fit: strong ICP overlap with target segment.
+Compounding value: this partnership compounds value over time.
+Strategic fit: strong ICP overlap with target segment.
+Compounding value: this partnership compounds value over time.
+No scoring table here at all.'
+
+# Edit replace_all:true deletes BOTH duplicated fit/cv paragraphs -> nothing
+# satisfying left -> deny. A first-occurrence-only bug would leave the
+# second copy intact and wrongly allow.
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '%s' "$DUP_GOOD" > "$td/$TARGET"
+old_block='Strategic fit: strong ICP overlap with target segment.
+Compounding value: this partnership compounds value over time.'
+printf '{"tool_name":"Edit","tool_input":{"file_path":"%s","old_string":%s,"new_string":"","replace_all":true},"cwd":"%s"}' \
+  "$TARGET" "$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$old_block")" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/strategic-fit-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" edit-replace-all-removes-all-occurrences-deny
+
+# MultiEdit mixed replace_all: the replace_all:true edit strips both fit/cv
+# copies (-> would deny alone); the replace_all:false edit only touches an
+# unrelated first line. Overall verdict must still be deny, proving the
+# replace_all:true edit's effect was not accidentally undone/ignored.
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '%s' "$DUP_GOOD" > "$td/$TARGET"
+payload="$(python3 -c '
+import json
+old_block = "Strategic fit: strong ICP overlap with target segment.\nCompounding value: this partnership compounds value over time."
+edits = [
+    {"old_string": "# Proposal", "new_string": "# Proposal (reviewed)", "replace_all": False},
+    {"old_string": old_block, "new_string": "", "replace_all": True},
+]
+print(json.dumps({"tool_name": "MultiEdit", "tool_input": {"file_path": "'"$TARGET"'", "edits": edits}, "cwd": "'"$td"'"}))
+')"
+printf '%s' "$payload" | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/strategic-fit-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" multiedit-mixed-replace-all-deny
+
+# malformed JSON: truncated
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+printf '{"tool_name":"Write","tool_inp' | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/strategic-fit-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" malformed-json-truncated-deny
+
+# malformed JSON: valid JSON but not an object (a bare array)
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+printf '[1,2,3]' | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/strategic-fit-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" malformed-json-non-object-deny
+
+# malformed JSON: empty stdin
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+printf '' | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/strategic-fit-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" malformed-json-empty-stdin-deny
+
+# stderr carries the deny reason (not lost to a stdout JSON blob)
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+stderr_out="$(printf '' | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/strategic-fit-gate.sh" 2>&1 >/dev/null)"
+rm -rf "$td"
+if printf '%s' "$stderr_out" | grep -q "strategic-fit-gate: refused"; then got=has-reason; else got=no-reason; fi
+report has-reason "$got" deny-reason-on-stderr
+
+# kill switch: unrecognized/typo value must stay active (regression for the
+# backwards case-statement bug)
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":%s},"cwd":"%s"}' \
+  "$TARGET" "$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$TABLE_NO_LANGUAGE")" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd STRATEGIC_FIT_GATE_OFF=xyzzy /bin/bash "$HOOKS/strategic-fit-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" kill-switch-unrecognized-value-stays-active
+
+# absolute file_path matching the same scope a relative fixture matches
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s/%s","content":%s},"cwd":"%s"}' \
+  "$td" "$TARGET" "$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$TABLE_NO_LANGUAGE")" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/strategic-fit-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" absolute-path-deny
+
+# ./-prefixed relative variant, same target
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '{"tool_name":"Write","tool_input":{"file_path":"./%s","content":%s},"cwd":"%s"}' \
+  "$TARGET" "$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$TABLE_NO_LANGUAGE")" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/strategic-fit-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" dot-slash-prefixed-path-deny
+
+# a Bash-tool write reaching this gate's scope is refused the same way a
+# Write call would be, instead of silently passing through unreconstructed
+td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"
+mkdir -p "$td/$(dirname "$TARGET")"
+printf '{"tool_name":"Bash","tool_input":{"command":"printf x >> %s"},"cwd":"%s"}' "$TARGET" "$td" \
+  | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$HOOKS/strategic-fit-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+rm -rf "$td"; report deny "$got" bash-tool-write-into-scope-deny
+
 printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
