@@ -5,7 +5,7 @@
 # References core canon `gate-lib.sh`/`gate-lib.py` (issue-72, gate-house
 # standard) for trap/kill-switch/path-normalize/reconstruct — never
 # reimplemented here (docs/handbooks/canon-scripts.md).
-. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh"
+. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh" || { echo "strategic-fit-gate.sh: cannot source gate-lib.sh" >&2; exit 2; }
 gate_trap_fail_closed
 set -uo pipefail
 
@@ -202,6 +202,10 @@ case "$verdict" in
   DENY_ORDER)
     gate_deny "$GATE_NAME" "a scoring table appears before the strategic-fit/compounding-value opening statement; wrong-partner deals must not clear the door on scoring alone."
     ;;
+  PASS)
+    gate_allow
+    ;;
+  *)
+    gate_deny "$GATE_NAME" "unrecognized verdict from substance check: $verdict"
+    ;;
 esac
-
-gate_allow

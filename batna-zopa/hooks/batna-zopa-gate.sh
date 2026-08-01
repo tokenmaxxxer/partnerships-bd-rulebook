@@ -5,7 +5,7 @@
 # References core canon `gate-lib.sh`/`gate-lib.py` (issue-72, gate-house
 # standard) for trap/kill-switch/path-normalize/reconstruct — never
 # reimplemented here (docs/handbooks/canon-scripts.md).
-. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh"
+. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh" || { echo "batna-zopa-gate.sh: cannot source gate-lib.sh" >&2; exit 2; }
 gate_trap_fail_closed
 set -uo pipefail
 
@@ -230,6 +230,10 @@ case "$verdict" in
   DENY_NO_ZOPA)
     gate_deny "$GATE_NAME" "a counterpart position is discussed but no ZOPA claim appears in the same structural neighborhood (heading or adjacent paragraph)."
     ;;
+  PASS)
+    gate_allow
+    ;;
+  *)
+    gate_deny "$GATE_NAME" "unrecognized verdict from substance check: $verdict"
+    ;;
 esac
-
-gate_allow
