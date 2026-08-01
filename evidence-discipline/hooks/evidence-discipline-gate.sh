@@ -1,58 +1,60 @@
 #!/usr/bin/env bash
 # evidence-discipline gate: stage declaration + citation-per-claim, fired
 # only on partnerships-bd phase-1 proposal writes.
+#
+# References core canon `gate-lib.sh`/`gate-lib.py` (issue-72, gate-house
+# standard) for trap/kill-switch/path-normalize/reconstruct — never
+# reimplemented here (docs/handbooks/canon-scripts.md).
+. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh"
+gate_trap_fail_closed
 set -uo pipefail
 
+GATE_NAME="evidence-discipline"
 payload="$(cat)"
+gate_kill_switch_active "${EVIDENCE_DISCIPLINE_GATE_OFF:-}" || { trap - EXIT; exit 0; }
 
-[ "${EVIDENCE_DISCIPLINE_GATE_OFF:-}" = "1" ] && exit 0
-
-deny() {
-  printf '{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$1"
-  exit 2
-}
-
-on_err() {
-  echo '{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"evidence-discipline: refused — gate crashed, failing closed."}}'
-  exit 2
-}
-trap on_err ERR
-
-command -v python3 >/dev/null 2>&1 || deny "evidence-discipline: refused — python3 not available, failing closed."
-
-[ -n "$payload" ] || deny "evidence-discipline: refused — empty stdin payload."
+command -v python3 >/dev/null 2>&1 || gate_deny "$GATE_NAME" "python3 not available, failing closed."
+[ -n "$payload" ] || gate_deny "$GATE_NAME" "empty stdin payload."
 
 parsed="$(printf '%s' "$payload" | python3 -c '
-import json, sys
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    print("__PARSE_ERROR__")
+import importlib.util, os, sys
+
+spec = importlib.util.spec_from_file_location("gate_lib", os.environ["GATE_LIB_PY"])
+gate_lib = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gate_lib)
+
+def deny(msg):
+    print("__DENY__")
+    print(msg)
     sys.exit(0)
-if not isinstance(data, dict):
-    print("__PARSE_ERROR__")
-    sys.exit(0)
-tool_input = data.get("tool_input")
+
+event = gate_lib.gate_parse_json_or_deny(sys.stdin.read(), deny)
+tool_input = event.get("tool_input")
 if not isinstance(tool_input, dict):
-    print("__PARSE_ERROR__")
-    sys.exit(0)
-tool_name = data.get("tool_name", "")
+    deny("the tool-call payload is not a JSON object; failing closed")
+tool_name = event.get("tool_name", "")
 file_path = tool_input.get("file_path", "")
-cwd = data.get("cwd", "")
+cwd = event.get("cwd", "")
+command = tool_input.get("command", "") if tool_name == "Bash" else ""
 print("__OK__")
 print(tool_name)
 print(file_path)
 print(cwd)
+print(command)
 ' 2>/dev/null)"
 
-first_line="$(printf '%s\n' "$parsed" | sed -n '1p')"
-[ "$first_line" = "__OK__" ] || deny "evidence-discipline: refused — malformed or non-dict tool_input."
+marker="$(printf '%s\n' "$parsed" | sed -n '1p')"
+if [ "$marker" = "__DENY__" ]; then
+  gate_deny "$GATE_NAME" "$(printf '%s\n' "$parsed" | sed -n '2p')"
+fi
+[ "$marker" = "__OK__" ] || gate_deny "$GATE_NAME" "malformed or non-dict tool_input."
 
 tool_name="$(printf '%s\n' "$parsed" | sed -n '2p')"
 file_path="$(printf '%s\n' "$parsed" | sed -n '3p')"
 cwd="$(printf '%s\n' "$parsed" | sed -n '4p')"
+bash_command="$(printf '%s\n' "$parsed" | sed -n '5p')"
 
-# --- resolve project root --------------------------------------------------
+# --- resolve + realpath the project root -----------------------------------
 _plausible() { [ -n "${1:-}" ] && [ -d "$1" ]; }
 
 root=""
@@ -63,20 +65,51 @@ elif root="$(git -C "${cwd:-.}" rev-parse --show-toplevel 2>/dev/null)"; then
 else
   root="${cwd:-$(pwd -P)}"
 fi
+root="$(cd "$root" 2>/dev/null && pwd -P || printf '%s' "$root")"
 
-# --- only this plugin's target surface -------------------------------------
+[ "${CLAUDE_ROLE:-}" = "partnerships-bd" ] || exit 0
+
+SCOPE_PATTERN='^docs/issue-[0-9]+/proposals/.*\.md$'
+
+normalize_rel() {
+  GATE_LIB_PY="$GATE_LIB_PY" python3 -c '
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("gate_lib", os.environ["GATE_LIB_PY"])
+gate_lib = importlib.util.module_from_spec(spec); spec.loader.exec_module(gate_lib)
+rel = gate_lib.gate_normalize_path(sys.argv[1], sys.argv[2])
+print(rel if rel is not None else "")
+' "$root" "$1"
+}
+
+if [ "$tool_name" = "Bash" ]; then
+  while IFS= read -r tok; do
+    [ -n "$tok" ] || continue
+    tok_rel="$(normalize_rel "$tok")"
+    [ -n "$tok_rel" ] || continue
+    if printf '%s' "$tok_rel" | grep -Eq "$SCOPE_PATTERN"; then
+      gate_deny "$GATE_NAME" "a Bash-tool command writes into this gate's scope ($tok_rel); refusing rather than letting a Bash write bypass Write/Edit/MultiEdit review."
+    fi
+  done <<EOF
+$(gate_bash_write_targets "$bash_command")
+EOF
+  exit 0
+fi
+
+rel_path="$(normalize_rel "$file_path")"
+[ -n "$rel_path" ] || exit 0
+printf '%s' "$rel_path" | grep -Eq "$SCOPE_PATTERN" || exit 0
+
 case "$file_path" in
   /*) abs_path="$file_path" ;;
   *) abs_path="$root/$file_path" ;;
 esac
-rel_path="${abs_path#"$root"/}"
 
-[ "${CLAUDE_ROLE:-}" = "partnerships-bd" ] || exit 0
-echo "$rel_path" | grep -Eq '^docs/issue-[0-9]+/proposals/.*\.md$' || exit 0
-
-# --- reconstruct resulting text --------------------------------------------
 resulting_text="$(python3 -c '
-import json, sys
+import importlib.util, json, os, sys
+
+spec = importlib.util.spec_from_file_location("gate_lib", os.environ["GATE_LIB_PY"])
+gate_lib = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gate_lib)
 
 payload = sys.argv[1]
 abs_path = sys.argv[2]
@@ -97,64 +130,17 @@ def read_current():
     except Exception:
         return None
 
-if tool_name == "Write":
-    content = tool_input.get("content")
-    if content is None:
-        print("__RECON_ERROR__")
-        sys.exit(0)
-    print("__RECON_OK__")
-    print(content, end="")
+current_content = read_current() if tool_name != "Write" else None
+text, ok = gate_lib.gate_reconstruct_write(tool_name, tool_input, current_content)
+if not ok:
+    print("__RECON_ERROR__")
     sys.exit(0)
-
-if tool_name == "Edit":
-    old_string = tool_input.get("old_string")
-    new_string = tool_input.get("new_string")
-    if old_string is None or new_string is None:
-        print("__RECON_ERROR__")
-        sys.exit(0)
-    current = read_current()
-    if current is None:
-        print("__RECON_ERROR__")
-        sys.exit(0)
-    if old_string not in current:
-        print("__RECON_ERROR__")
-        sys.exit(0)
-    result = current.replace(old_string, new_string, 1)
-    print("__RECON_OK__")
-    print(result, end="")
-    sys.exit(0)
-
-if tool_name == "MultiEdit":
-    edits = tool_input.get("edits")
-    if not isinstance(edits, list) or not edits:
-        print("__RECON_ERROR__")
-        sys.exit(0)
-    current = read_current()
-    if current is None:
-        print("__RECON_ERROR__")
-        sys.exit(0)
-    for e in edits:
-        if not isinstance(e, dict):
-            print("__RECON_ERROR__")
-            sys.exit(0)
-        old_string = e.get("old_string")
-        new_string = e.get("new_string")
-        if old_string is None or new_string is None:
-            print("__RECON_ERROR__")
-            sys.exit(0)
-        if old_string not in current:
-            print("__RECON_ERROR__")
-            sys.exit(0)
-        current = current.replace(old_string, new_string, 1)
-    print("__RECON_OK__")
-    print(current, end="")
-    sys.exit(0)
-
-print("__RECON_ERROR__")
+print("__RECON_OK__")
+print(text, end="")
 ' "$payload" "$abs_path")"
 
 recon_marker="$(printf '%s\n' "$resulting_text" | sed -n '1p')"
-[ "$recon_marker" = "__RECON_OK__" ] || deny "evidence-discipline: refused — cannot determine resulting content"
+[ "$recon_marker" = "__RECON_OK__" ] || gate_deny "$GATE_NAME" "cannot determine resulting content"
 body="$(printf '%s\n' "$resulting_text" | tail -n +2)"
 
 # --- facet checks -----------------------------------------------------------
@@ -169,11 +155,13 @@ if not stage_re.search(text):
     print("DENY_NO_STAGE")
     sys.exit(0)
 
-# (b) citation ------------------------------------------------------------
+# (b) citation, anchored to a Source/Sources heading or a labeled
+# source/cite/citation line with an actual value, or a markdown link —
+# not a bare substring occurrence of the word "source" anywhere.
 has_citation = False
 
 for line in text.splitlines():
-    m = re.search(r"(?i)\b(source|cite|citation)\b.*?:(.*)", line)
+    m = re.search(r"(?i)\b(source|cite|citation)s?\b\s*:(.*)", line)
     if m and m.group(2).strip():
         has_citation = True
         break
@@ -183,8 +171,8 @@ if not has_citation and re.search(r"\[[^\]]*\]\([^)]*\)", text):
 
 if not has_citation:
     for line in text.splitlines():
-        hm = re.match(r"(?i)^\s{0,3}#+\s*(.*)", line)
-        if hm and re.search(r"(?i)source", hm.group(1)):
+        hm = re.match(r"(?i)^\s{0,3}#{1,6}\s*(.*)", line)
+        if hm and re.search(r"(?i)sources?\b", hm.group(1)):
             has_citation = True
             break
 
@@ -197,11 +185,11 @@ print("PASS")
 
 case "$verdict" in
   DENY_NO_STAGE)
-    deny "evidence-discipline: refused — proposal does not declare its stage (non-binding vs binding-terms-ready)."
+    gate_deny "$GATE_NAME" "proposal does not declare its stage (non-binding vs binding-terms-ready)."
     ;;
   DENY_NO_CITATION)
-    deny "evidence-discipline: refused — proposal has no citation/source for its framework or factual claims."
+    gate_deny "$GATE_NAME" "proposal has no citation/source for its framework or factual claims."
     ;;
 esac
 
-exit 0
+gate_allow
