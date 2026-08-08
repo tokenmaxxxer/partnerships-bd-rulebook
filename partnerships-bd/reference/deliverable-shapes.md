@@ -53,6 +53,17 @@ this role):
 - `partner-unreachable`
 - `stage-undeclared`
 
+This vocabulary is documented here as prose convention, not enforced via
+`docs/specs/record-fields-terminal-states.json`: that override mechanism
+(core canon, contract v3 §2) accepts only the fixed nine contract record
+kinds (`coding-record`, `feasibility-record`, `ops-record`,
+`product-record`, `qa-record`, `reflect-record`, `review-record`,
+`ux-design-record`, `verify-record`) — confirmed at build time by
+`record-fields-gate.sh` refusing both `partnerships-bd` and
+`partnerships-bd-record` as unrecognized kinds. `partnerships-bd` is not
+one of those nine, so no terminal-states override exists for it; human
+PR review is what enforces this vocabulary until core adds such a kind.
+
 ## Phase-1 proposal convention (documented only, no gate yet)
 
 Phase-1 proposal docs for this role should additionally open with a
