@@ -25,11 +25,33 @@ Must contain these named sub-sections, in this order:
 2. roles & responsibilities of each party
 3. value/profit-sharing or capital-contribution terms
 4. governance — decision-making authority thresholds (kept distinct
-   from KPIs)
+   from KPIs) — this sub-section is this role's home for the
+   marketplace spec's `governance_note` required field (issue-16)
 5. KPIs/success metrics — measurable, accountability-bearing
 6. dispute resolution mechanism
 7. exit/termination clause — conditions, notice periods, wind-down
    obligations (non-optional)
+
+## partner_id
+
+Required top-level record field (marketplace spec, issue-16): the
+counterpart org/individual identifier every partnerships-bd record must
+carry. State it plainly — legal entity name or equivalent identifier —
+at the top of the record, alongside the deal-structure-verdict.
+
+## lifecycle_stage
+
+Required top-level record field (marketplace spec, issue-16), replacing
+the prior two-value non-binding/binding-terms-ready description below
+with the spec's five-value vocabulary (shared with `loop_state`, since
+deal lifecycle and loop_state are the same underlying progression for
+this role):
+
+- `assessing`
+- `collaborating`
+- `landed`
+- `partner-unreachable`
+- `stage-undeclared`
 
 ## Phase-1 proposal convention (documented only, no gate yet)
 

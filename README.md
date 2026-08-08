@@ -6,7 +6,8 @@ generated as skeleton scaffolding by issue-170.
 
 - **decides**: 파트너십이 구조적으로 성립하는가
 - **use_when**: 제휴/BD 딜 구조가 걸릴 때
-- **produces**: deal structure verdict, term sheet outline
+- **produces**: deal structure verdict, term sheet outline, `partner_id`,
+  `lifecycle_stage`, `governance_note` (marketplace spec fields, issue-16)
 - **write_scope**: []
 - **hand-off**: 법적 계약 검토는 → legal-compliance
 
@@ -40,7 +41,9 @@ it as load-bearing.
 Five methodology plugins live as siblings of the `partnerships-bd` role
 plugin, one per adopted methodology. Each is self-contained (own
 `directive.sh`, own gate script, own `tests/*-tests.sh`), fails closed, and
-carries its own kill-switch env var.
+carries its own kill-switch env var. Records this role produces carry the
+marketplace spec's three required fields — `partner_id`, `lifecycle_stage`,
+`governance_note` — per `partnerships-bd/reference/deliverable-shapes.md`.
 
 - `strategic-fit-gate` — checks the deal fits strategic intent before scoring starts
 - `multi-axis-scoring` — scores the deal against the reference axes (`reference/axes.md`)
