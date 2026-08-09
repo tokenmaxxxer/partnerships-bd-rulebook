@@ -49,6 +49,10 @@ repo_root="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}"
 rec_rel="docs/issue-999/reports/partnerships-bd.md"
 prop_rel="docs/issue-999/proposals/x-partnerships-bd.md"
 
+# Convention: docs/specs/test-env-resolution.md (on-the-record issue #551).
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/lib" && pwd -P)"
+. "$LIB_DIR/resolve-core.sh"
+
 substance_probe() {
   gates="$(find "$repo_root"/partnerships-bd "$repo_root"/strategic-fit-gate \
                 "$repo_root"/multi-axis-scoring "$repo_root"/batna-zopa \
@@ -62,7 +66,7 @@ substance_probe() {
       git init -q "$td"
       mkdir -p "$td/$(dirname "$rel")"
       payload="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":""},"cwd":"%s"}' "$rel" "$td")"
-      printf '%s' "$payload" | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd /bin/bash "$g" >/dev/null 2>&1
+      printf '%s' "$payload" | env CLAUDE_PROJECT_DIR="$td" CLAUDE_ROLE=partnerships-bd CLAUDE_PLUGIN_ROOT_CORE="$CORE_ROOT" /bin/bash "$g" >/dev/null 2>&1
       rc_g=$?
       rm -rf "$td"
       if [ "$rc_g" = 2 ]; then
@@ -78,5 +82,10 @@ substance_probe() {
   return 0
 }
 
-substance_probe || rc=1
+if CORE_ROOT="$(resolve_core "$repo_root/../core" "$repo_root/../tokenmaxxxer-core/core")"; then
+  export CLAUDE_PLUGIN_ROOT_CORE="$CORE_ROOT"
+  substance_probe || rc=1
+else
+  echo "deny-only-check: SKIP — substance_probe unverifiable outside spawn env (see docs/specs/test-env-resolution.md)"
+fi
 exit "$rc"
