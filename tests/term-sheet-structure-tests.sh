@@ -3,6 +3,10 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 HOOKS="$HERE/../term-sheet-structure/hooks"
+. "$HERE/lib/resolve-core.sh"
+# Convention: docs/specs/test-env-resolution.md (on-the-record issue #551).
+CORE_ROOT="$(resolve_core "$HERE/../../core" "$HERE/../../tokenmaxxxer-core/core")" || exit 75
+export CLAUDE_PLUGIN_ROOT_CORE="$CORE_ROOT"
 pass=0; fail=0
 report() { if [ "$2" = "$1" ]; then pass=$((pass+1)); printf 'ok     %-34s %s\n' "$3" "$2"; else fail=$((fail+1)); printf 'FAIL   %-34s want=%s got=%s\n' "$3" "$1" "$2"; fi; }
 
