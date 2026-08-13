@@ -27,6 +27,12 @@ claude plugin install partnerships-bd
   divergence, read by core canon's role-agnostic record-fields gate
 - `partnerships-bd/agents/warrant-hunter.md` — rotating-stance hunt agent
 - `docs/specs/approvers.md` — Approve-authority allowlist (see below)
+- `playbook/<axis>.md` — operational decision-rule playbook (issue #1174):
+  condition -> choice -> source rules per BD decision axis (deal-structure
+  selection, exclusivity/scope terms, governance cadence/KPI,
+  negotiation positioning, term-sheet comprehensibility/convention),
+  each carrying a `rule_count_floor`/`axis` front-matter pair for
+  `gates/playbook_depth_gate.py` (parent repo) to check against
 
 The record-required-fields, commit-trailer, and handbook-sync gates are
 core canon (issue-66), invoked by path against this role's `hooks/` tree —
