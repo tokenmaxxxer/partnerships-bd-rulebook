@@ -13,6 +13,22 @@ Must show its derivation, not just a final yes/no/score:
   financial health, legal/compliance posture, operational capability,
   cultural fit, compounding-value. Each axis carries an explicit weight
   and score; the scores sum to the verdict.
+- **strategic/ICP fit axis: name the partner tier, not just a fit
+  score.** State which tier the counterpart falls in (e.g. strategic /
+  preferred / transactional) and what that tier changes about the deal
+  — resourcing depth, exclusivity terms, review cadence. A fit score
+  with no tier collapses "worth doing" and "worth doing at this depth"
+  into one number; the tier is what a reviewer needs to sanity-check the
+  weight actually assigned.
+- **Gate the tier claim on independent-demand evidence before scoring
+  it.** Before the strategic/ICP-fit axis is scored at all, name the
+  evidence that the counterpart brings independent demand (named
+  accounts they can point to, an end-customer relationship, a sales
+  motion of their own) as distinct from a counterpart chasing
+  preferential terms with no demand of their own. If that evidence
+  cannot be honestly stated, the axis score is not yet defensible —
+  stop and get the evidence before scoring, rather than scoring a
+  guess.
 - **BATNA statement** — the proposer's own walk-away alternative,
   named explicitly, not implied.
 - **ZOPA estimate** — where a counterpart position is known.
@@ -26,11 +42,35 @@ Must contain these named sub-sections, in this order:
 3. value/profit-sharing or capital-contribution terms
 4. governance — decision-making authority thresholds (kept distinct
    from KPIs) — this sub-section is this role's home for the
-   marketplace spec's `governance_note` required field (issue-16)
+   marketplace spec's `governance_note` required field (issue-16).
+   Name the approval-embedding point explicitly: which existing,
+   already-adopted workflow surface (the counterpart's own deal review
+   channel, not a new standalone portal) each threshold's approval
+   actually routes through. A threshold with no named routing point is
+   an authority claim nobody will act on when the deal is live. Each
+   threshold names a specific human approver, never "approved" as a
+   bare state — the verdict this role hands up is always a recommendation
+   plus a named approver, not an auto-approval. A single
+   deal-killing risk signal (e.g. uncapped indemnity, no data-processing
+   terms, unlimited exclusivity with no minimums) overrides an otherwise
+   high composite score and forces escalation regardless of the
+   weighted-axis total — do not let a strong multi-axis score wave
+   through a term that is disqualifying on its own.
 5. KPIs/success metrics — measurable, accountability-bearing
 6. dispute resolution mechanism
 7. exit/termination clause — conditions, notice periods, wind-down
-   obligations (non-optional)
+   obligations (non-optional). State the cure period length for each
+   named breach condition and the post-termination handling of shared
+   data/IP explicitly — a notice period with no cure window or with
+   data/IP handling left implicit is not a wind-down obligation a
+   counterpart can actually execute against. Write the unwind
+   trigger conditions (the measurable thresholds — e.g. missed
+   volume commitment for N consecutive periods, named-account
+   sourcing falling to zero — that justify exercising this clause)
+   directly into this sub-section at deal-signing time, not left for
+   a future review to improvise: an exit clause with no pre-agreed
+   trigger makes the unwind a fresh negotiation instead of a
+   mechanical exercise of an already-agreed right.
 
 ## partner_id
 
